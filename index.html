@@ -477,16 +477,6 @@
       return clarified.join("\n");
     }
 
-    function addToneHint(text) {
-      const hints = {
-        casual: "自然で親しい会話として: ",
-        polite: "丁寧な表現として: ",
-        business: "ビジネスで失礼のない表現として: ",
-        natural: ""
-      };
-      return `${hints[tone.value] || ""}${text}`;
-    }
-
     function clarifyInput() {
       const raw = inputText.value.trim();
       if (!raw) {
@@ -505,7 +495,7 @@
         assistStatus.textContent = "補完なし";
       }
 
-      clarifiedText.value = addToneHint(clarified);
+      clarifiedText.value = clarified;
       updateCounts();
       return clarifiedText.value.trim();
     }
