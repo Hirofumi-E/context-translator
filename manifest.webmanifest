@@ -1,0 +1,18 @@
+{
+  "name": "Context Translator",
+  "short_name": "Context",
+  "description": "A context-aware translation helper with subject clarification.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b100f",
+  "theme_color": "#101614",
+  "icons": [
+    {
+      "src": "./translator-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

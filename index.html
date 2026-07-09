@@ -1,0 +1,689 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101614">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Context Translator">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>Context Translator</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./translator-icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./translator-icon.svg">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b100f;
+      --panel: #151d1a;
+      --panel-2: #1c2723;
+      --field: #0f1715;
+      --ink: #edf6f2;
+      --muted: #9bada6;
+      --line: #30423c;
+      --accent: #56c9b7;
+      --accent-2: #8eb7ff;
+      --warn: #efbd75;
+      --danger: #ff8585;
+      --shadow: 0 18px 52px rgba(0, 0, 0, 0.42);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        linear-gradient(135deg, rgba(86, 201, 183, 0.11), transparent 34%),
+        linear-gradient(315deg, rgba(142, 183, 255, 0.08), transparent 38%),
+        var(--bg);
+      -webkit-text-size-adjust: 100%;
+    }
+
+    button, select, input, textarea {
+      font: inherit;
+      color: var(--ink);
+    }
+
+    button, select, summary { touch-action: manipulation; }
+
+    .app {
+      width: min(1320px, calc(100% - 24px));
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 16px 0;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 12px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.45rem, 2.4vw, 2.3rem);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .status {
+      min-width: 142px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(21, 29, 26, 0.92);
+      color: var(--muted);
+      padding: 9px 12px;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .status.busy { color: var(--accent); border-color: rgba(86, 201, 183, 0.45); }
+    .status.warn { color: var(--warn); border-color: rgba(239, 189, 117, 0.45); }
+    .status.error { color: var(--danger); border-color: rgba(255, 133, 133, 0.45); }
+
+    .toolbar, .pane, .settings {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(21, 29, 26, 0.92);
+      box-shadow: var(--shadow);
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr 44px 1fr 1fr 1fr auto;
+      gap: 10px;
+      align-items: end;
+      padding: 12px;
+    }
+
+    label {
+      display: grid;
+      gap: 5px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 750;
+    }
+
+    select, input {
+      width: 100%;
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background-color: var(--field);
+      background-image: none;
+      color: var(--ink);
+      outline: none;
+      padding: 0 11px;
+    }
+
+    select option { background: var(--field); color: var(--ink); }
+
+    textarea {
+      width: 100%;
+      min-width: 0;
+      resize: none;
+      border: 0;
+      outline: none;
+      padding: 14px;
+      color: var(--ink);
+      background-color: var(--field);
+      line-height: 1.65;
+      font-size: 0.98rem;
+      caret-color: var(--accent);
+    }
+
+    input::placeholder, textarea::placeholder { color: #74857f; opacity: 1; }
+
+    select:focus, input:focus, textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(86, 201, 183, 0.16);
+    }
+
+    .icon-button, .text-button {
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background-color: var(--panel-2);
+      color: var(--ink);
+      cursor: pointer;
+      font-weight: 750;
+    }
+
+    .icon-button {
+      width: 44px;
+      display: grid;
+      place-items: center;
+      color: var(--accent);
+      font-size: 1.1rem;
+    }
+
+    .text-button { padding: 0 13px; }
+    .text-button.primary { border-color: var(--accent); background: var(--accent); color: #07110f; }
+    .text-button.secondary { border-color: rgba(142, 183, 255, 0.38); color: var(--accent-2); }
+    .text-button:hover, .icon-button:hover { border-color: var(--accent); }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 0.82fr 1.2fr 1.2fr;
+      gap: 12px;
+      min-height: 560px;
+    }
+
+    .pane {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      overflow: hidden;
+    }
+
+    .pane-head, .pane-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 11px 13px;
+      color: var(--muted);
+    }
+
+    .pane-head { border-bottom: 1px solid var(--line); }
+    .pane-foot { min-height: 48px; border-top: 1px solid var(--line); font-size: 0.86rem; }
+    .pane-title { color: var(--ink); font-weight: 850; }
+
+    .stack {
+      display: grid;
+      grid-template-rows: 1fr 1fr;
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .stack .pane textarea { min-height: 180px; }
+    .main-text textarea { min-height: 420px; }
+
+    .actions {
+      display: flex;
+      gap: 7px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .assist {
+      color: var(--warn);
+      font-size: 0.86rem;
+    }
+
+    .settings { overflow: hidden; }
+    summary { cursor: pointer; padding: 12px 14px; color: var(--accent); font-weight: 850; }
+    .settings-body { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 14px 14px; }
+    .wide { grid-column: 1 / -1; }
+    .note { margin: 0; color: var(--muted); line-height: 1.5; font-size: 0.9rem; }
+
+    @media (max-width: 980px) {
+      .app { width: min(100% - 16px, 680px); padding: 10px 0; }
+      header { display: grid; }
+      .toolbar { grid-template-columns: 1fr 46px 1fr; }
+      .toolbar label:first-child, .toolbar label:nth-child(5), .toolbar label:nth-child(6), .toolbar .primary { grid-column: 1 / -1; }
+      .workspace, .settings-body { grid-template-columns: 1fr; }
+      .workspace { min-height: 0; }
+      .stack { grid-template-rows: auto auto; }
+      select, input, textarea { font-size: 16px; }
+      select, input, .icon-button, .text-button { min-height: 46px; }
+      .main-text textarea, .stack .pane textarea { min-height: 230px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <h1>Context Translator</h1>
+      <div id="status" class="status">待機中</div>
+    </header>
+
+    <section class="toolbar" aria-label="翻訳設定">
+      <label>
+        翻訳エンジン
+        <select id="provider">
+          <option value="google">Google 非公式</option>
+          <option value="mymemory">MyMemory 無料API</option>
+          <option value="libretranslate">LibreTranslate</option>
+        </select>
+      </label>
+      <label>
+        元の言語
+        <select id="sourceLang">
+          <option value="auto">自動判定</option>
+          <option value="ja">日本語</option>
+          <option value="en">English</option>
+          <option value="tl">Tagalog</option>
+          <option value="ko">한국어</option>
+          <option value="zh">中文</option>
+        </select>
+      </label>
+      <button id="swapButton" class="icon-button" title="入れ替え" aria-label="入れ替え">⇄</button>
+      <label>
+        翻訳先
+        <select id="targetLang">
+          <option value="ja">日本語</option>
+          <option value="en">English</option>
+          <option value="tl">Tagalog</option>
+          <option value="ko">한국어</option>
+          <option value="zh">中文</option>
+        </select>
+      </label>
+      <label>
+        会話方向
+        <select id="direction">
+          <option value="me-to-you">私から相手へ</option>
+          <option value="you-to-me">相手から私へ</option>
+          <option value="neutral">第三者/中立</option>
+        </select>
+      </label>
+      <label>
+        口調
+        <select id="tone">
+          <option value="natural">自然</option>
+          <option value="casual">カジュアル</option>
+          <option value="polite">丁寧</option>
+          <option value="business">ビジネス</option>
+        </select>
+      </label>
+      <button id="translateButton" class="text-button primary">補完して翻訳</button>
+    </section>
+
+    <section class="workspace">
+      <div class="stack">
+        <article class="pane">
+          <div class="pane-head">
+            <span class="pane-title">文脈</span>
+            <button id="saveMemoryButton" class="text-button secondary">結果を文脈へ</button>
+          </div>
+          <textarea id="contextText" placeholder="例: 相手が資料を送る予定。私は確認している。"></textarea>
+          <div class="pane-foot"><span id="contextCount">0文字</span><span>翻訳前に参照</span></div>
+        </article>
+
+        <article class="pane">
+          <div class="pane-head">
+            <span class="pane-title">補完文</span>
+            <span id="assistStatus" class="assist">ルール補完</span>
+          </div>
+          <textarea id="clarifiedText" placeholder="主語や目的語を補った文が出ます"></textarea>
+          <div class="pane-foot"><span id="clarifiedCount">0文字</span><span>編集可</span></div>
+        </article>
+      </div>
+
+      <article class="pane main-text">
+        <div class="pane-head">
+          <span class="pane-title">入力</span>
+          <div class="actions">
+            <button id="pasteButton" class="text-button secondary">貼付</button>
+            <button id="copyInputButton" class="text-button secondary">コピー</button>
+            <button id="clearButton" class="text-button">消去</button>
+          </div>
+        </div>
+        <textarea id="inputText" placeholder="省略された日本語でもOK。例: もう送った？"></textarea>
+        <div class="pane-foot"><span id="inputCount">0文字</span><span>自動補完 0.6秒</span></div>
+      </article>
+
+      <article class="pane main-text">
+        <div class="pane-head">
+          <span class="pane-title">翻訳結果</span>
+          <button id="copyOutputButton" class="text-button secondary">コピー</button>
+        </div>
+        <textarea id="outputText" placeholder="翻訳結果がここに表示されます"></textarea>
+        <div class="pane-foot"><span id="outputCount">0文字</span><span id="copyStatus"></span></div>
+      </article>
+    </section>
+
+    <details class="settings">
+      <summary>接続設定</summary>
+      <div class="settings-body">
+        <label class="wide">
+          LibreTranslate API URL
+          <input id="libreUrl" value="http://localhost:5000/translate">
+        </label>
+        <label>
+          LibreTranslate APIキー
+          <input id="libreKey" placeholder="必要な場合のみ">
+        </label>
+        <label>
+          MyMemory email
+          <input id="myMemoryEmail" placeholder="任意">
+        </label>
+        <p class="note wide">文脈補完は端末内のルールで行います。翻訳時は選択した翻訳エンジンへ、補完後の文が送信されます。秘密の文章は自前LibreTranslate推奨です。</p>
+      </div>
+    </details>
+  </main>
+
+  <script>
+    const $ = selector => document.querySelector(selector);
+    const provider = $("#provider");
+    const sourceLang = $("#sourceLang");
+    const targetLang = $("#targetLang");
+    const direction = $("#direction");
+    const tone = $("#tone");
+    const contextText = $("#contextText");
+    const clarifiedText = $("#clarifiedText");
+    const inputText = $("#inputText");
+    const outputText = $("#outputText");
+    const statusBox = $("#status");
+    const assistStatus = $("#assistStatus");
+    const copyStatus = $("#copyStatus");
+    const libreUrl = $("#libreUrl");
+    const libreKey = $("#libreKey");
+    const myMemoryEmail = $("#myMemoryEmail");
+    const counts = {
+      context: $("#contextCount"),
+      clarified: $("#clarifiedCount"),
+      input: $("#inputCount"),
+      output: $("#outputCount")
+    };
+
+    const GOOGLE_CHUNK_LIMIT = 4200;
+    const MYMEMORY_CHUNK_LIMIT = 450;
+    const LIBRE_CHUNK_LIMIT = 3500;
+
+    let timer = 0;
+    let activeController = null;
+
+    const saved = JSON.parse(localStorage.getItem("contextTranslatorSettings") || "{}");
+    provider.value = saved.provider || "google";
+    sourceLang.value = saved.sourceLang || "auto";
+    targetLang.value = saved.targetLang || "en";
+    direction.value = saved.direction || "me-to-you";
+    tone.value = saved.tone || "natural";
+    contextText.value = saved.contextText || "";
+    libreUrl.value = saved.libreUrl || libreUrl.value;
+    libreKey.value = saved.libreKey || "";
+    myMemoryEmail.value = saved.myMemoryEmail || "";
+
+    function saveSettings() {
+      localStorage.setItem("contextTranslatorSettings", JSON.stringify({
+        provider: provider.value,
+        sourceLang: sourceLang.value,
+        targetLang: targetLang.value,
+        direction: direction.value,
+        tone: tone.value,
+        contextText: contextText.value,
+        libreUrl: libreUrl.value.trim(),
+        libreKey: libreKey.value.trim(),
+        myMemoryEmail: myMemoryEmail.value.trim()
+      }));
+    }
+
+    function setStatus(text, mode = "") {
+      statusBox.textContent = text;
+      statusBox.className = `status ${mode}`.trim();
+    }
+
+    function updateCounts() {
+      counts.context.textContent = `${contextText.value.length}文字`;
+      counts.clarified.textContent = `${clarifiedText.value.length}文字`;
+      counts.input.textContent = `${inputText.value.length}文字`;
+      counts.output.textContent = `${outputText.value.length}文字`;
+    }
+
+    function detectLanguage(text) {
+      if (/[\u3040-\u30ff\u3400-\u9fff]/.test(text)) return "ja";
+      if (/[\uac00-\ud7af]/.test(text)) return "ko";
+      if (/[ñÑ]|\b(ang|ng|mga|ako|ikaw|siya|kami|kayo|sila)\b/i.test(text)) return "tl";
+      return "en";
+    }
+
+    function hasExplicitSubject(text) {
+      return /(私|僕|俺|自分|あなた|君|彼|彼女|相手|先方|お客様|we|i |you |he |she |they )/i.test(text);
+    }
+
+    function isQuestion(text) {
+      return /[？?]$|かな$|か$|の$|ましたか$|ですか$/.test(text.trim());
+    }
+
+    function inferSubject(text) {
+      if (hasExplicitSubject(text)) return "";
+      if (direction.value === "neutral") return "その人は";
+      const asking = isQuestion(text);
+      if (direction.value === "me-to-you") return asking ? "あなたは" : "私は";
+      if (direction.value === "you-to-me") return asking ? "私は" : "あなたは";
+      return "";
+    }
+
+    function inferObjectFromContext() {
+      const context = contextText.value;
+      const pairs = [
+        [/資料|書類|ファイル|PDF|契約書/, "資料を"],
+        [/メール|返信|連絡|メッセージ/, "メッセージを"],
+        [/予約|予定|スケジュール/, "予定を"],
+        [/支払い|振込|請求/, "支払いを"],
+        [/荷物|商品|注文/, "荷物を"]
+      ];
+      return pairs.find(([pattern]) => pattern.test(context))?.[1] || "";
+    }
+
+    function clarifyJapanese(text) {
+      const lines = text.split(/\n+/).map(line => line.trim()).filter(Boolean);
+      const object = inferObjectFromContext();
+      const clarified = lines.map(line => {
+        if (hasExplicitSubject(line)) return line;
+        const subject = inferSubject(line);
+        if (!subject) return line;
+        const needsObject = object && /(送った|送る|送って|確認した|確認して|見た|見る|受け取った|受け取って)/.test(line) && !/(を|資料|メール|書類|ファイル|PDF)/.test(line);
+        return `${subject}${needsObject ? object : ""}${line}`;
+      });
+      return clarified.join("\n");
+    }
+
+    function addToneHint(text) {
+      const hints = {
+        casual: "自然で親しい会話として: ",
+        polite: "丁寧な表現として: ",
+        business: "ビジネスで失礼のない表現として: ",
+        natural: ""
+      };
+      return `${hints[tone.value] || ""}${text}`;
+    }
+
+    function clarifyInput() {
+      const raw = inputText.value.trim();
+      if (!raw) {
+        clarifiedText.value = "";
+        assistStatus.textContent = "ルール補完";
+        updateCounts();
+        return "";
+      }
+
+      const source = sourceLang.value === "auto" ? detectLanguage(raw) : sourceLang.value;
+      let clarified = raw;
+      if (source === "ja") {
+        clarified = clarifyJapanese(raw);
+        assistStatus.textContent = clarified === raw ? "補完なし" : "主語補完済み";
+      } else {
+        assistStatus.textContent = "補完なし";
+      }
+
+      clarifiedText.value = addToneHint(clarified);
+      updateCounts();
+      return clarifiedText.value.trim();
+    }
+
+    function scheduleWork() {
+      saveSettings();
+      updateCounts();
+      clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        clarifyInput();
+        translate();
+      }, 600);
+    }
+
+    function mapLang(language, engine) {
+      if (language === "auto") return "auto";
+      if (engine === "google" && language === "tl") return "fil";
+      return language;
+    }
+
+    function splitText(text, maxLength) {
+      const chunks = [];
+      let rest = text.trim();
+      while (rest.length > maxLength) {
+        const windowText = rest.slice(0, maxLength);
+        const punctuationBreak = Math.max(windowText.lastIndexOf("。"), windowText.lastIndexOf("！"), windowText.lastIndexOf("？"), windowText.lastIndexOf("."), windowText.lastIndexOf("!"), windowText.lastIndexOf("?"), windowText.lastIndexOf("\n"));
+        const softBreak = Math.max(windowText.lastIndexOf(" "), windowText.lastIndexOf("　"), windowText.lastIndexOf(","), windowText.lastIndexOf("、"));
+        const breakAt = punctuationBreak > 120 ? punctuationBreak + 1 : softBreak > 120 ? softBreak + 1 : maxLength;
+        chunks.push(rest.slice(0, breakAt).trim());
+        rest = rest.slice(breakAt).trim();
+      }
+      if (rest) chunks.push(rest);
+      return chunks;
+    }
+
+    async function translate() {
+      const sourceText = clarifiedText.value.trim() || clarifyInput();
+      if (!sourceText) {
+        outputText.value = "";
+        updateCounts();
+        setStatus("待機中");
+        return;
+      }
+
+      const engine = provider.value;
+      const detectedSource = sourceLang.value === "auto" ? detectLanguage(inputText.value || sourceText) : sourceLang.value;
+      if (detectedSource === targetLang.value) {
+        outputText.value = sourceText;
+        updateCounts();
+        setStatus("同じ言語", "warn");
+        return;
+      }
+
+      if (activeController) activeController.abort();
+      activeController = new AbortController();
+      setStatus("翻訳中", "busy");
+
+      try {
+        outputText.value = await translateByProvider(engine, sourceText, detectedSource, targetLang.value, activeController.signal, (done, total) => {
+          setStatus(total > 1 ? `翻訳中 ${done}/${total}` : "翻訳中", "busy");
+        });
+        updateCounts();
+        setStatus("完了");
+      } catch (error) {
+        if (error.name === "AbortError") return;
+        outputText.value = error.message || "翻訳に失敗しました";
+        updateCounts();
+        setStatus("翻訳失敗", "error");
+      }
+    }
+
+    async function translateByProvider(engine, text, source, target, signal, onProgress) {
+      const limit = engine === "mymemory" ? MYMEMORY_CHUNK_LIMIT : engine === "libretranslate" ? LIBRE_CHUNK_LIMIT : GOOGLE_CHUNK_LIMIT;
+      const chunks = splitText(text, limit);
+      const translated = [];
+      onProgress(0, chunks.length);
+      for (const [index, chunk] of chunks.entries()) {
+        if (engine === "mymemory") translated.push(await translateMyMemory(chunk, source, target, signal));
+        else if (engine === "libretranslate") translated.push(await translateLibre(chunk, source, target, signal));
+        else translated.push(await translateGoogle(chunk, source, target, signal));
+        onProgress(index + 1, chunks.length);
+      }
+      return translated.join("\n");
+    }
+
+    async function translateGoogle(text, source, target, signal) {
+      const url = new URL("https://translate.googleapis.com/translate_a/single");
+      url.searchParams.set("client", "gtx");
+      url.searchParams.set("sl", mapLang(source, "google"));
+      url.searchParams.set("tl", mapLang(target, "google"));
+      url.searchParams.set("dt", "t");
+      url.searchParams.set("q", text);
+      const response = await fetch(url, { signal });
+      if (!response.ok) throw new Error(`Google HTTP ${response.status}`);
+      const data = await response.json();
+      const result = Array.isArray(data?.[0]) ? data[0].map(item => item?.[0] || "").join("") : "";
+      if (!result) throw new Error("Google翻訳の結果が空です");
+      return result;
+    }
+
+    async function translateMyMemory(text, source, target, signal) {
+      const url = new URL("https://api.mymemory.translated.net/get");
+      url.searchParams.set("q", text);
+      url.searchParams.set("langpair", `${source}|${target}`);
+      if (myMemoryEmail.value.trim()) url.searchParams.set("de", myMemoryEmail.value.trim());
+      const response = await fetch(url, { signal });
+      if (!response.ok) throw new Error(`MyMemory HTTP ${response.status}`);
+      const data = await response.json();
+      return data?.responseData?.translatedText || "";
+    }
+
+    async function translateLibre(text, source, target, signal) {
+      const endpoint = libreUrl.value.trim();
+      if (!endpoint) throw new Error("LibreTranslate API URLが必要です");
+      const body = { q: text, source, target, format: "text" };
+      if (libreKey.value.trim()) body.api_key = libreKey.value.trim();
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal
+      });
+      if (!response.ok) throw new Error(`LibreTranslate HTTP ${response.status}`);
+      const data = await response.json();
+      return data.translatedText || data.translation || "";
+    }
+
+    async function copyText(value) {
+      if (!value.trim()) {
+        copyStatus.textContent = "内容なし";
+        return;
+      }
+      await navigator.clipboard.writeText(value);
+      copyStatus.textContent = "コピー済み";
+      window.setTimeout(() => copyStatus.textContent = "", 1500);
+    }
+
+    $("#translateButton").addEventListener("click", () => { clarifyInput(); translate(); });
+    $("#swapButton").addEventListener("click", () => {
+      const oldSource = sourceLang.value === "auto" ? detectLanguage(inputText.value) : sourceLang.value;
+      sourceLang.value = targetLang.value;
+      targetLang.value = oldSource;
+      inputText.value = outputText.value;
+      scheduleWork();
+    });
+    $("#pasteButton").addEventListener("click", async () => {
+      try { inputText.value = await navigator.clipboard.readText(); scheduleWork(); }
+      catch { setStatus("貼付失敗", "error"); }
+    });
+    $("#copyInputButton").addEventListener("click", () => copyText(inputText.value));
+    $("#copyOutputButton").addEventListener("click", () => copyText(outputText.value));
+    $("#clearButton").addEventListener("click", () => {
+      inputText.value = "";
+      clarifiedText.value = "";
+      outputText.value = "";
+      updateCounts();
+      setStatus("待機中");
+    });
+    $("#saveMemoryButton").addEventListener("click", () => {
+      const addition = outputText.value.trim();
+      if (!addition) return;
+      contextText.value = `${contextText.value.trim()}\n${addition}`.trim();
+      saveSettings();
+      updateCounts();
+    });
+
+    [provider, sourceLang, targetLang, direction, tone, contextText, libreUrl, libreKey, myMemoryEmail, inputText].forEach(element => {
+      element.addEventListener("input", scheduleWork);
+      element.addEventListener("change", scheduleWork);
+    });
+    clarifiedText.addEventListener("input", () => { updateCounts(); });
+    outputText.addEventListener("input", updateCounts);
+
+    if ("serviceWorker" in navigator && location.protocol !== "file:") {
+      navigator.serviceWorker.register("./sw.js").catch(() => {});
+    }
+
+    updateCounts();
+  </script>
+</body>
+</html>
