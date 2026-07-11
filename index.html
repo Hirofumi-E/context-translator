@@ -418,7 +418,8 @@
 
     function stripLegacyToneHint(text) {
       return text
-        .replace(/^(自然で親しい会話として|自然で親しみやすい会話として|丁寧な表現として|ビジネスで失礼のない表現として)\s*[:：]\s*/gm, "")
+        .replace(/^(自然で[^:：\n]*会話として|丁寧な表現として|ビジネスで失礼のない表現として)\s*[:：]\s*/gm, "")
+        .replace(/^(Natural and [^:：\n]*conversation|As a polite expression|As a business-safe expression)\s*[:：]\s*/gim, "")
         .trim();
     }
 
