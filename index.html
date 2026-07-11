@@ -97,7 +97,7 @@
 
     .toolbar {
       display: grid;
-      grid-template-columns: 1.1fr 1fr 44px 1fr 1fr 1fr auto;
+      grid-template-columns: 1.1fr 1fr 44px 1fr 1fr auto;
       gap: 10px;
       align-items: end;
       padding: 12px;
@@ -228,7 +228,7 @@
       .app { width: min(100% - 16px, 680px); padding: 10px 0; }
       header { display: grid; }
       .toolbar { grid-template-columns: 1fr 46px 1fr; }
-      .toolbar label:first-child, .toolbar label:nth-child(5), .toolbar label:nth-child(6), .toolbar .primary { grid-column: 1 / -1; }
+      .toolbar label:first-child, .toolbar label:nth-child(5), .toolbar .primary { grid-column: 1 / -1; }
       .workspace, .settings-body { grid-template-columns: 1fr; }
       .workspace { min-height: 0; }
       .stack { grid-template-rows: auto auto; }
@@ -282,15 +282,6 @@
           <option value="me-to-you">私から相手へ</option>
           <option value="you-to-me">相手から私へ</option>
           <option value="neutral">第三者/中立</option>
-        </select>
-      </label>
-      <label>
-        口調
-        <select id="tone">
-          <option value="natural">自然</option>
-          <option value="casual">カジュアル</option>
-          <option value="polite">丁寧</option>
-          <option value="business">ビジネス</option>
         </select>
       </label>
       <button id="translateButton" class="text-button primary">補完して翻訳</button>
@@ -366,7 +357,6 @@
     const sourceLang = $("#sourceLang");
     const targetLang = $("#targetLang");
     const direction = $("#direction");
-    const tone = $("#tone");
     const contextText = $("#contextText");
     const clarifiedText = $("#clarifiedText");
     const inputText = $("#inputText");
@@ -396,7 +386,6 @@
     sourceLang.value = saved.sourceLang || "auto";
     targetLang.value = saved.targetLang || "en";
     direction.value = saved.direction || "me-to-you";
-    tone.value = saved.tone || "natural";
     contextText.value = saved.contextText || "";
     libreUrl.value = saved.libreUrl || libreUrl.value;
     libreKey.value = saved.libreKey || "";
@@ -408,7 +397,6 @@
         sourceLang: sourceLang.value,
         targetLang: targetLang.value,
         direction: direction.value,
-        tone: tone.value,
         contextText: contextText.value,
         libreUrl: libreUrl.value.trim(),
         libreKey: libreKey.value.trim(),
@@ -426,6 +414,12 @@
       counts.clarified.textContent = `${clarifiedText.value.length}文字`;
       counts.input.textContent = `${inputText.value.length}文字`;
       counts.output.textContent = `${outputText.value.length}文字`;
+    }
+
+    function stripLegacyToneHint(text) {
+      return text
+        .replace(/^(自然で親しい会話として|自然で親しみやすい会話として|丁寧な表現として|ビジネスで失礼のない表現として)\s*[:：]\s*/gm, "")
+        .trim();
     }
 
     function detectLanguage(text) {
@@ -478,7 +472,7 @@
     }
 
     function clarifyInput() {
-      const raw = inputText.value.trim();
+      const raw = stripLegacyToneHint(inputText.value);
       if (!raw) {
         clarifiedText.value = "";
         assistStatus.textContent = "ルール補完";
@@ -495,7 +489,7 @@
         assistStatus.textContent = "補完なし";
       }
 
-      clarifiedText.value = clarified;
+      clarifiedText.value = stripLegacyToneHint(clarified);
       updateCounts();
       return clarifiedText.value.trim();
     }
@@ -532,7 +526,7 @@
     }
 
     async function translate() {
-      const sourceText = clarifiedText.value.trim() || clarifyInput();
+      const sourceText = stripLegacyToneHint(clarifiedText.value) || clarifyInput();
       if (!sourceText) {
         outputText.value = "";
         updateCounts();
@@ -662,7 +656,7 @@
       updateCounts();
     });
 
-    [provider, sourceLang, targetLang, direction, tone, contextText, libreUrl, libreKey, myMemoryEmail, inputText].forEach(element => {
+    [provider, sourceLang, targetLang, direction, contextText, libreUrl, libreKey, myMemoryEmail, inputText].forEach(element => {
       element.addEventListener("input", scheduleWork);
       element.addEventListener("change", scheduleWork);
     });
