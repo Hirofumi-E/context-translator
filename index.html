@@ -218,6 +218,55 @@
       font-size: 0.86rem;
     }
 
+    .history-list, .candidate-list {
+      display: grid;
+      gap: 8px;
+      padding: 10px 13px;
+      border-top: 1px solid var(--line);
+      background: rgba(15, 23, 21, 0.72);
+      color: var(--muted);
+      font-size: 0.84rem;
+      line-height: 1.45;
+      max-height: 150px;
+      overflow: auto;
+    }
+
+    .history-item {
+      display: grid;
+      gap: 2px;
+      padding: 8px;
+      border: 1px solid rgba(142, 183, 255, 0.18);
+      border-radius: 8px;
+      background: rgba(28, 39, 35, 0.74);
+    }
+
+    .history-item strong {
+      color: var(--ink);
+      font-size: 0.8rem;
+    }
+
+    .candidate-list {
+      grid-template-columns: 1fr;
+      max-height: 170px;
+    }
+
+    .candidate-button {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid rgba(86, 201, 183, 0.32);
+      border-radius: 8px;
+      background: rgba(28, 39, 35, 0.9);
+      color: var(--ink);
+      cursor: pointer;
+      padding: 8px 10px;
+      text-align: left;
+      line-height: 1.45;
+    }
+
+    .candidate-button:hover {
+      border-color: var(--accent);
+    }
+
     .settings { overflow: hidden; }
     summary { cursor: pointer; padding: 12px 14px; color: var(--accent); font-weight: 850; }
     .settings-body { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 14px 14px; }
@@ -295,6 +344,7 @@
             <button id="saveMemoryButton" class="text-button secondary">結果を文脈へ</button>
           </div>
           <textarea id="contextText" placeholder="例: 相手が資料を送る予定。私は確認している。"></textarea>
+          <div id="historyList" class="history-list"></div>
           <div class="pane-foot"><span id="contextCount">0文字</span><span>翻訳前に参照</span></div>
         </article>
 
@@ -304,6 +354,7 @@
             <span id="assistStatus" class="assist">ルール補完</span>
           </div>
           <textarea id="clarifiedText" placeholder="主語や目的語を補った文が出ます"></textarea>
+          <div id="candidateList" class="candidate-list"></div>
           <div class="pane-foot"><span id="clarifiedCount">0文字</span><span>編集可</span></div>
         </article>
       </div>
@@ -346,6 +397,37 @@
           MyMemory email
           <input id="myMemoryEmail" placeholder="任意">
         </label>
+        <label>
+          相手の名前
+          <input id="partnerName" placeholder="例: Anne">
+        </label>
+        <label>
+          相手との関係
+          <select id="relationship">
+            <option value="fiancee">フィアンセ</option>
+            <option value="partner">パートナー</option>
+            <option value="friend">友達</option>
+            <option value="coworker">同僚</option>
+            <option value="business">仕事相手</option>
+          </select>
+        </label>
+        <label>
+          表現の好み
+          <select id="stylePreference">
+            <option value="gentle">優しく自然</option>
+            <option value="short">短く自然</option>
+            <option value="clear">誤解なく明確</option>
+            <option value="polite">丁寧</option>
+          </select>
+        </label>
+        <label>
+          履歴保存件数
+          <select id="historyLimit">
+            <option value="3">3件</option>
+            <option value="5">5件</option>
+            <option value="8">8件</option>
+          </select>
+        </label>
         <p class="note wide">文脈補完は端末内のルールで行います。翻訳時は選択した翻訳エンジンへ、補完後の文が送信されます。秘密の文章は自前LibreTranslate推奨です。</p>
       </div>
     </details>
@@ -367,6 +449,12 @@
     const libreUrl = $("#libreUrl");
     const libreKey = $("#libreKey");
     const myMemoryEmail = $("#myMemoryEmail");
+    const partnerName = $("#partnerName");
+    const relationship = $("#relationship");
+    const stylePreference = $("#stylePreference");
+    const historyLimit = $("#historyLimit");
+    const historyList = $("#historyList");
+    const candidateList = $("#candidateList");
     const counts = {
       context: $("#contextCount"),
       clarified: $("#clarifiedCount"),
@@ -380,6 +468,7 @@
 
     let timer = 0;
     let activeController = null;
+    let conversationHistory = JSON.parse(localStorage.getItem("contextTranslatorHistory") || "[]");
 
     const saved = JSON.parse(localStorage.getItem("contextTranslatorSettings") || "{}");
     provider.value = saved.provider || "google";
@@ -390,6 +479,10 @@
     libreUrl.value = saved.libreUrl || libreUrl.value;
     libreKey.value = saved.libreKey || "";
     myMemoryEmail.value = saved.myMemoryEmail || "";
+    partnerName.value = saved.partnerName || "";
+    relationship.value = saved.relationship || "fiancee";
+    stylePreference.value = saved.stylePreference || "gentle";
+    historyLimit.value = saved.historyLimit || "5";
 
     function saveSettings() {
       localStorage.setItem("contextTranslatorSettings", JSON.stringify({
@@ -400,7 +493,11 @@
         contextText: contextText.value,
         libreUrl: libreUrl.value.trim(),
         libreKey: libreKey.value.trim(),
-        myMemoryEmail: myMemoryEmail.value.trim()
+        myMemoryEmail: myMemoryEmail.value.trim(),
+        partnerName: partnerName.value.trim(),
+        relationship: relationship.value,
+        stylePreference: stylePreference.value,
+        historyLimit: historyLimit.value
       }));
     }
 
@@ -421,6 +518,61 @@
         .replace(/^(自然で[^:：\n]*会話として|丁寧な表現として|ビジネスで失礼のない表現として)\s*[:：]\s*/gm, "")
         .replace(/^(Natural and [^:：\n]*conversation|As a polite expression|As a business-safe expression)\s*[:：]\s*/gim, "")
         .trim();
+    }
+
+    function renderHistory() {
+      if (!conversationHistory.length) {
+        historyList.innerHTML = "<span>履歴なし</span>";
+        return;
+      }
+
+      historyList.innerHTML = conversationHistory
+        .slice(0, Number(historyLimit.value) || 5)
+        .map(item => `
+          <div class="history-item">
+            <strong>${escapeHtml(item.directionLabel || "履歴")}</strong>
+            <span>${escapeHtml(item.input || "")}</span>
+            <span>${escapeHtml(item.output || "")}</span>
+          </div>
+        `)
+        .join("");
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function buildHistoryContext() {
+      return conversationHistory
+        .slice(0, Number(historyLimit.value) || 5)
+        .map(item => `${item.directionLabel}: ${item.input} => ${item.output}`)
+        .join("\n");
+    }
+
+    function buildProfileContext() {
+      const relationshipLabels = {
+        fiancee: "相手はフィアンセ。冷たく聞こえない、優しい言い方を優先する。",
+        partner: "相手は親しいパートナー。自然で柔らかい言い方を優先する。",
+        friend: "相手は友達。自然なカジュアル表現を優先する。",
+        coworker: "相手は同僚。自然だが失礼のない表現を優先する。",
+        business: "相手は仕事相手。明確で丁寧な表現を優先する。"
+      };
+      const preferenceLabels = {
+        gentle: "優しく自然",
+        short: "短く自然",
+        clear: "誤解なく明確",
+        polite: "丁寧"
+      };
+      return [
+        partnerName.value.trim() ? `相手の名前: ${partnerName.value.trim()}` : "",
+        relationshipLabels[relationship.value] || "",
+        `表現の好み: ${preferenceLabels[stylePreference.value] || "自然"}`
+      ].filter(Boolean).join("\n");
     }
 
     function detectLanguage(text) {
@@ -448,7 +600,7 @@
     }
 
     function inferObjectFromContext() {
-      const context = contextText.value;
+      const context = `${buildProfileContext()}\n${contextText.value}\n${buildHistoryContext()}`;
       const pairs = [
         [/資料|書類|ファイル|PDF|契約書/, "資料を"],
         [/メール|返信|連絡|メッセージ/, "メッセージを"],
@@ -472,6 +624,55 @@
       return clarified.join("\n");
     }
 
+    function isAmbiguousJapanese(text) {
+      const source = sourceLang.value === "auto" ? detectLanguage(text) : sourceLang.value;
+      return source === "ja" && text && !hasExplicitSubject(text);
+    }
+
+    function buildClarificationCandidates(text) {
+      const cleaned = stripLegacyToneHint(text).trim();
+      if (!isAmbiguousJapanese(cleaned)) return [];
+
+      const object = inferObjectFromContext();
+      const needsObject = object && /(送った|送る|送って|確認した|確認して|見た|見る|受け取った|受け取って)/.test(cleaned) && !/(を|資料|メール|書類|ファイル|PDF)/.test(cleaned);
+      const target = `${needsObject ? object : ""}${cleaned}`;
+      const candidates = [];
+
+      if (direction.value === "me-to-you" || direction.value === "neutral") {
+        candidates.push({ label: "相手が主語", text: `あなたは${target}` });
+        candidates.push({ label: "自分が主語", text: `私は${target}` });
+      } else {
+        candidates.push({ label: "自分が主語", text: `私は${target}` });
+        candidates.push({ label: "相手が主語", text: `あなたは${target}` });
+      }
+
+      candidates.push({ label: "第三者が主語", text: `その人は${target}` });
+      return candidates;
+    }
+
+    function renderCandidates(candidates) {
+      if (!candidates.length) {
+        candidateList.innerHTML = "<span>候補なし</span>";
+        return;
+      }
+
+      candidateList.innerHTML = candidates.map((candidate, index) => `
+        <button class="candidate-button" type="button" data-index="${index}">
+          ${escapeHtml(candidate.label)}: ${escapeHtml(candidate.text)}
+        </button>
+      `).join("");
+
+      candidateList.querySelectorAll("button").forEach(button => {
+        button.addEventListener("click", () => {
+          const candidate = candidates[Number(button.dataset.index)];
+          clarifiedText.value = candidate.text;
+          assistStatus.textContent = "候補を選択";
+          updateCounts();
+          translate();
+        });
+      });
+    }
+
     function clarifyInput() {
       const raw = stripLegacyToneHint(inputText.value);
       if (!raw) {
@@ -483,6 +684,7 @@
 
       const source = sourceLang.value === "auto" ? detectLanguage(raw) : sourceLang.value;
       let clarified = raw;
+      const candidates = buildClarificationCandidates(raw);
       if (source === "ja") {
         clarified = clarifyJapanese(raw);
         assistStatus.textContent = clarified === raw ? "補完なし" : "主語補完済み";
@@ -491,6 +693,7 @@
       }
 
       clarifiedText.value = stripLegacyToneHint(clarified);
+      renderCandidates(candidates);
       updateCounts();
       return clarifiedText.value.trim();
     }
@@ -552,6 +755,7 @@
         outputText.value = await translateByProvider(engine, sourceText, detectedSource, targetLang.value, activeController.signal, (done, total) => {
           setStatus(total > 1 ? `翻訳中 ${done}/${total}` : "翻訳中", "busy");
         });
+        saveConversation(sourceText, outputText.value);
         updateCounts();
         setStatus("完了");
       } catch (error) {
@@ -560,6 +764,32 @@
         updateCounts();
         setStatus("翻訳失敗", "error");
       }
+    }
+
+    function saveConversation(input, output) {
+      if (!input.trim() || !output.trim()) return;
+
+      const directionLabel = direction.value === "me-to-you"
+        ? "私から相手へ"
+        : direction.value === "you-to-me"
+          ? "相手から私へ"
+          : "中立";
+
+      const last = conversationHistory[0];
+      if (last && last.input === input && last.output === output) return;
+
+      conversationHistory = [
+        {
+          input,
+          output,
+          directionLabel,
+          createdAt: new Date().toISOString()
+        },
+        ...conversationHistory
+      ].slice(0, 12);
+
+      localStorage.setItem("contextTranslatorHistory", JSON.stringify(conversationHistory));
+      renderHistory();
     }
 
     async function translateByProvider(engine, text, source, target, signal, onProgress) {
@@ -657,7 +887,7 @@
       updateCounts();
     });
 
-    [provider, sourceLang, targetLang, direction, contextText, libreUrl, libreKey, myMemoryEmail, inputText].forEach(element => {
+    [provider, sourceLang, targetLang, direction, contextText, libreUrl, libreKey, myMemoryEmail, partnerName, relationship, stylePreference, historyLimit, inputText].forEach(element => {
       element.addEventListener("input", scheduleWork);
       element.addEventListener("change", scheduleWork);
     });
@@ -668,6 +898,8 @@
       navigator.serviceWorker.register("./sw.js").catch(() => {});
     }
 
+    renderHistory();
+    renderCandidates([]);
     updateCounts();
   </script>
 </body>

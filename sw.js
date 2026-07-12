@@ -1,4 +1,4 @@
-const CACHE_NAME = "context-translator-v3";
+const CACHE_NAME = "context-translator-v4";
 const APP_ASSETS = [
   "./",
   "./index.html",
